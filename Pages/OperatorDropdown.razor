@@ -1,0 +1,53 @@
+﻿@using MudBlazor
+@using System.Linq.Expressions
+
+
+@if (DataType == typeof(string))
+{
+    <MudSelect T="string" AnchorOrigin="Origin.BottomCenter" Value="Value" ValueChanged="OnValueChanged" ValueExpression="ValueExpression" Required="Required" Placeholder="Operator">
+        <MudSelectItem Value="@("contains")">Contains</MudSelectItem>
+        <MudSelectItem Value="@("not contains")">Not Contains</MudSelectItem>
+        <MudSelectItem Value="@("equals")">Equals</MudSelectItem>
+        <MudSelectItem Value="@("starts with")">Starts With</MudSelectItem>
+        <MudSelectItem Value="@("ends with")">Ends With</MudSelectItem>
+        <MudSelectItem Value="@("is empty")">Is Empty</MudSelectItem>
+        <MudSelectItem Value="@("is not empty")">Is Not Empty</MudSelectItem>
+    </MudSelect>
+}
+else if (DataType == typeof(int) || DataType == typeof(short) || DataType == typeof(DateTime))
+{
+    <MudSelect T="string" AnchorOrigin="Origin.BottomCenter" Value="Value" ValueChanged="OnValueChanged" ValueExpression="ValueExpression" Required="Required" Placeholder="Operator">
+        <MudSelectItem Value="@("=")" />
+        <MudSelectItem Value="@("!=")" />
+        <MudSelectItem Value="@("<")" />
+        <MudSelectItem Value="@(">")" />
+        <MudSelectItem Value="@("<=")" />
+        <MudSelectItem Value="@(">=")" />
+        <MudSelectItem Value="@("is empty")">Is Empty</MudSelectItem>
+        <MudSelectItem Value="@("is not empty")">Is Not Empty</MudSelectItem>
+    </MudSelect>
+}
+
+@code {
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public Type DataType { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public Expression<Func<string?>>? ValueExpression { get; set; }
+
+    [Parameter]
+    public bool Required { get; set; } = false; // Default to false
+
+
+    private async Task OnValueChanged(string? newValue)
+    {
+        Value = newValue;
+        await ValueChanged.InvokeAsync(newValue);
+    }
+}

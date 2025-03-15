@@ -1,0 +1,500 @@
+﻿@page "/list"
+@using AdvancedCustomDataFiltering.Models
+@using AdvancedCustomDataFiltering.Services
+@using AdvancedCustomDataFiltering.Utilities
+@using MudBlazor
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@inject NavigationManager navigationManager
+@inject IDialogService DialogService
+@inject IJSRuntime JSRuntime
+@inject IDialogService DialogService
+@inject IPersonService personService
+@implements IDisposable
+
+@*Page Styling*@
+<style>
+    #tableContainer {
+    overflow-x: auto;
+    }
+
+    body table {
+    font-size: 0.70rem !important; /* Adjust this value as needed */
+    }
+
+    th, th button i {
+    white-space: nowrap;
+    }
+
+    .align-bottom {
+    display: flex;
+    align-items: flex-end;
+    }
+</style>
+
+@*Page Header*@
+<MudContainer MaxWidth="MaxWidth.ExtraLarge">
+    <MudGrid>
+        <MudItem md="12">
+            <MudBreadcrumbs Items="_items" Class="m"></MudBreadcrumbs>
+        </MudItem>
+        <MudItem Class="text-left mb-0 mt-0 pb-0" md="6" id="PageHeader">
+            <MudText class="mb-0 mt-0" Typo="Typo.h4">Data Filtering</MudText>
+        </MudItem>
+        <MudItem md="12" Class="mb-0">
+            <MudDivider />
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@*Table Components*@
+@if (data != null && data.Items.Any())
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge">
+        <MudGrid>
+            <MudItem md="12" Class="pb-0">
+                <MudExpansionPanels Elevation="1">
+                    <MudExpansionPanel IsExpanded="@isExpanded" IsExpandedChanged="HandlePanelExpand" Text="Columns">
+                        <!-- Use the CSS columns approach: -->
+                        <div style="column-count: 5; column-gap: 1rem;">
+                            @foreach (var column in columns.OrderBy(c => c.Header))
+                            {
+                                <div style="break-inside: avoid;">
+                                    <!-- break-inside: avoid; helps prevent awkward splitting inside columns -->
+                                    <div class="form-check form-switch">
+                                        <input type="checkbox"
+                                               class="form-check-input"
+                                               checked="@column.IsVisible"
+                                               @onchange="(e) => ToggleColumnVisibility(column, (bool)e.Value)" />
+                                        <label class="form-check-label">@column.Header</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudItem>
+        </MudGrid>
+
+
+        <MudGrid Justify="Justify.SpaceBetween">
+            <MudItem md="3" Class="align-bottom">
+                @*<MudFab Color="Color.Secondary" StartIcon="@Icons.Material.Filled.ChangeCircle" Style="margin-right:10px;" DisableElevation Size="Size.Small" Label="Change Status" /> *@
+                <MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Download" DisableElevation Size="Size.Small" Label="Export" OnClick="ExportToCsv"/>
+            </MudItem>
+            <MudItem md="3">
+                <MudTextField T="string" Margin="Margin.Dense" Label="Search"
+                Value="@requestModel.Search"
+                ValueChanged="OnSearchChanged"
+                Immediate="false"
+                Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search" />
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid>
+            <MudItem md="12" Class="pb-0">
+                <div id="tableControlsContainer">
+                    <div id="tableContainer">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <input type="checkbox" @onclick="SelectAll" checked="@IsAllSelected()" />
+                                    </th>
+                                    @foreach (var column in columns.Where(c => c.IsVisible))
+                                    {
+                                        <th style="font-size: 0.80rem !important;">
+                                            <div class="header-content" style="display: inline-flex; align-items: center; justify-content: space-between; width: 100%;">
+                                                <button @onclick="() => HandleSortClick(column)">
+                                                    <strong>@column.Header</strong>
+                                                </button>
+                                                <div class="header-controls">
+                                                    @switch (column.SortDirection)
+                                                    {
+                                                        case "asc":
+                                                            <i class="fa-solid fa-angles-down" style="margin-left:4px;"></i>
+                                                            break;
+                                                        case "desc":
+                                                            <i class="fa-solid fa-angles-up" style="margin-left:4px;"></i>
+                                                            break;
+                                                        default:
+                                                            break;
+                                                    }
+                                                    <button style="margin-left:5px;" @onclick="() => OpenFilterDialogAsync(column)">
+                                                        @if (column.Filters.Count() > 0)
+                                                        {
+                                                            <MudIcon Size="Size.Small" Icon="@Icons.Material.Filled.FilterAlt" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <MudIcon Size="Size.Small" Icon="@Icons.Material.Outlined.FilterAlt" />
+                                                        }
+                                                    </button>
+
+                                                </div>
+                                            </div>
+                                        </th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in data.Items)
+                                {
+                                    <tr>
+                                        <td>
+                                            <input type="checkbox" @onchange="e => OnSelectObservation(e, d)"
+                                            checked="@IsSelected(d.Id)" />
+                                        </td>
+                                        @foreach (var column in columns.Where(c => c.IsVisible))
+                                        {
+                                            <td>@(column.DataBinding(d) ?? "empty")</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </MudItem>
+
+            <MudItem md=12>
+                <MudGrid Justify="Justify.SpaceBetween">
+                    <MudItem md="3">
+                        <span style="margin-right:40px;">@selectedRecords.Count() Items Selected</span>
+                        <span>Row Count: @rowCount</span>
+                    </MudItem>
+
+                    <MudItem md="6">
+                        @if (totalPages > 1)
+                        {
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination justify-content-center">
+                                    <!-- Previous page button -->
+                                    <li class="page-item @(requestModel.Page == 1 ? "disabled" : "")">
+                                        <a class="page-link" href="javascript:void(0)" @onclick="() => HandlePageChange(requestModel.Page - 1)">Previous</a>
+                                    </li>
+
+                                    @foreach (var p in GetPageNumbers())
+                                    {
+                                        <!-- Page button -->
+                                        <li class="page-item @(requestModel.Page == p ? "active" : "")">
+                                            <a class="page-link" href="javascript:void(0)" @onclick="() => HandlePageChange(p)">@p</a>
+                                        </li>
+                                    }
+
+                                    <!-- Next page button -->
+                                    <li class="page-item @(requestModel.Page == totalPages ? "disabled" : "")">
+                                        <a class="page-link" href="javascript:void(0)" @onclick="() => HandlePageChange(requestModel.Page + 1)">Next</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    </MudItem>
+
+                    <MudItem md="3">
+                        <label>Rows Per Page:</label>
+                        <select @onchange="(e) => HandlePageSizeChange((string)e.Value)">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="250">250</option>
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                            <option value="2500">2500</option>
+                            <option value="5000">5000</option>
+                            <option value="10000">10000</option>
+                        </select>
+                        <span class="float-end">Page @requestModel.Page of @totalPages</span>
+                    </MudItem>
+                </MudGrid>
+            </MudItem>
+        </MudGrid>
+    </MudContainer>
+}
+
+@code {
+    //Page Variables
+    private int totalPages;
+    private int rowCount;
+    private bool isExpanded = false;
+    private bool isLoading = false;
+    private bool shouldExportCsv = false;
+    private ListRequestModel requestModel = new();
+    private DataListDTO data = new DataListDTO { Items = new List<Person>() }; // Assuming Observation is the model for data.Items
+    private List<BreadcrumbItem> _items = new List<BreadcrumbItem>
+	{
+		new BreadcrumbItem("Home", href: "#"),
+		new BreadcrumbItem("List", href: null, disabled: true)
+	};
+    private List<ColumnDefinition> columns = new List<ColumnDefinition>
+    {
+        new ColumnDefinition { Header = "Id", DataBinding = o => o.Id, IsVisible = true, SortDirection = "asc", DataType = typeof(int), PropertyName = "Id" },
+        new ColumnDefinition { Header = "First Name", DataBinding = o => o.FirstName, IsVisible = true, DataType = typeof(string), PropertyName = "FirstName" },
+        new ColumnDefinition { Header = "Last Name", DataBinding = o => o.LastName, IsVisible = true, DataType = typeof(string), PropertyName = "LastName" },
+        new ColumnDefinition { Header = "Email", DataBinding = o => o.Email, IsVisible = true, DataType = typeof(string), PropertyName = "Email" },
+        new ColumnDefinition { Header = "Street", DataBinding = o => o.Street, IsVisible = true, DataType = typeof(string), PropertyName = "Street" },
+        new ColumnDefinition { Header = "City", DataBinding = o => o.City, IsVisible = true, DataType = typeof(string), PropertyName = "City" },
+        new ColumnDefinition { Header = "State", DataBinding = o => o.State, IsVisible = true, DataType = typeof(string), PropertyName = "State" },
+        new ColumnDefinition { Header = "Zip", DataBinding = o => o.Zip, IsVisible = true, DataType = typeof(string), PropertyName = "Zip" }
+    };
+    private List<int> selectedRecords = new List<int>();
+
+
+    //Page Initialization Logic
+    protected override void OnInitialized()
+    {
+        LoadData();
+        StateHasChanged();
+    }
+
+    //Selection Logic
+    private bool IsSelected(int id)
+    {
+        // Check if this combination is in the list
+        return selectedRecords.Contains(id);
+    }
+
+    private void OnSelectObservation(ChangeEventArgs e, Person person)
+    {
+        var checkbox = (bool)e.Value;
+        var key = person.Id;
+
+        if (checkbox)
+        {
+            if (!selectedRecords.Contains(key))
+            {
+                selectedRecords.Add(key);
+            }
+        }
+        else
+        {
+            selectedRecords.Remove(key);
+        }
+    }
+
+    private void SelectAll()
+    {
+        if (selectedRecords.Count == data.Items.Count())
+        {
+            selectedRecords.Clear();
+        }
+        else
+        {
+            selectedRecords = data.Items
+                .Select(i => (i.Id))
+                .ToList();
+        }
+    }
+
+    private bool IsAllSelected()
+    {
+        return selectedRecords.Count == data.Items.Count();
+    }
+
+    //Paging Logic
+    private void HandlePageChange(int page)
+    {
+        if (page >= 1 && page <= totalPages)
+        {
+            requestModel.Page = page;
+            // Call a method to load the data for the selected page
+            LoadData();
+        }
+    }
+
+    private IEnumerable<int> GetPageNumbers()
+    {
+        const int maxPageButtons = 3;
+        var pageNumbers = new List<int>();
+
+        // Always show the first page
+        pageNumbers.Add(1);
+
+        // Show up to 8 pages, with current page at the center (if possible)
+        int startPage = Math.Max(2, requestModel.Page - (maxPageButtons / 2)); 
+        int endPage = Math.Min(totalPages - 1, requestModel.Page + (maxPageButtons / 2));
+
+        if (endPage - startPage < maxPageButtons - 2)
+        {
+            if (startPage == 2)
+            {
+                endPage = Math.Min(totalPages - 1, startPage + maxPageButtons - 2);
+            }
+            else
+            {
+                startPage = Math.Max(2, endPage - maxPageButtons + 2);
+            }
+        }
+
+        for (int i = startPage; i <= endPage; i++)
+        {
+            pageNumbers.Add(i);
+        }
+
+        // Always show the last page if it's not already in the list
+        if (totalPages > 1)
+        {
+            pageNumbers.Add(totalPages);
+        }
+
+        return pageNumbers;
+    }
+
+    private void HandlePageSizeChange(string size)
+    {
+        int intSize;
+        int.TryParse(size, out intSize);
+        requestModel.PageSize = intSize;
+        LoadData();
+    }
+
+    private void GetTotalPages()
+    {
+        totalPages = (int)Math.Ceiling((double)data.ItemTotalCount / requestModel.PageSize);  // Calculate total pages
+    }
+
+    //Column Visibility Logic
+    private void ToggleColumnVisibility(ColumnDefinition column, bool isVisible)
+    {
+        column.IsVisible = isVisible;
+        if (!isVisible)
+        {
+            column.SortDirection = null;
+            column.Filters.Clear();
+        }
+        StateHasChanged(); // Trigger re-render after visibility change
+    }
+
+    private void HandlePanelExpand()
+    {
+        isExpanded = !isExpanded;
+    }
+
+    //Filtering/Sorting Logic
+    private async Task OpenFilterDialogAsync(ColumnDefinition column)
+    {
+        var parameters = new DialogParameters
+        {
+            { "column", column },
+            { "OnSubmitSuccess", EventCallback.Factory.Create<bool>(this, OnSubmitSuccess) }
+        };
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        await DialogService.ShowAsync<ColumnFilterModal>("Filter Column", parameters, options);
+
+        requestModel.Page = 1;
+    }
+
+    private async Task HandleSortClick(ColumnDefinition column)
+    {
+        switch (column.SortDirection)
+        {
+            case null:
+                column.SortDirection = "asc";
+                break;
+            case "asc":
+                column.SortDirection = "desc";
+                break;
+            case "desc":
+                column.SortDirection = null;
+                break;
+            default:
+                break;
+        }
+
+        LoadData();
+    }
+
+    private void OnSearchChanged(string value)
+    {
+        requestModel.Search = value;
+        requestModel.Page = 1;
+        LoadData();
+    }
+
+    //Data Load Logic
+    private void LoadData()
+    {
+        try
+        {
+            isLoading = true;
+            requestModel.Columns = columns;
+            data = personService.GetPeople(requestModel);
+            GetTotalPages();
+            rowCount = data.Items.Count() > requestModel.PageSize ? requestModel.PageSize : data.Items.Count();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            var errorMessage = Uri.EscapeDataString("Error Retrieving Record: " + ex.Message);
+            navigationManager.NavigateTo($"not-found?message={errorMessage}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    //Update Observation Status Logic
+    private void OnSubmitSuccess()
+    {
+        selectedRecords.Clear();
+        LoadData();
+    }
+
+    // private async Task OpenUpdateDialogAsync()
+    // {
+    //     var parameters = new DialogParameters
+    //     {
+    //         { "selectedObservations", selectedRecords },
+    //         { "OnSubmitSuccess", EventCallback.Factory.Create<bool>(this, OnSubmitSuccess) }
+    //     };
+
+    //     var options = new DialogOptions { CloseOnEscapeKey = true };
+
+    //     await DialogService.ShowAsync<UpdateObsModal>("Update Observation Status", parameters, options);
+    // }
+
+    //Export Logic
+    private void ExportToCsv()
+    {
+        shouldExportCsv = true;
+        StateHasChanged(); // Request a re-render so OnAfterRenderAsync gets called
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldExportCsv)
+        {
+            shouldExportCsv = false;
+
+            var csvContent = new StringBuilder();
+
+            // Get only visible columns
+            var visibleColumns = columns.Where(c => c.IsVisible).ToList();
+
+            // Append headers with MakeCsvSafe applied
+            csvContent.AppendLine(string.Join(",", visibleColumns.Select(c => CsvHelper.MakeCsvSafe(c.Header))));
+
+            // Append data rows with MakeCsvSafe applied
+            foreach (var item in data.Items)
+            {
+                var row = string.Join(",", visibleColumns.Select(column =>
+                    CsvHelper.MakeCsvSafe(column.DataBinding(item)?.ToString() ?? string.Empty)
+                ));
+
+                csvContent.AppendLine(row);
+            }
+
+            await JSRuntime.InvokeVoidAsync("downloadCsv", "export.csv", csvContent.ToString());
+        }
+    }
+
+    public void Dispose()
+    {
+
+    }
+}

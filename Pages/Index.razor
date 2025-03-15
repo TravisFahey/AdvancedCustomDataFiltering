@@ -1,0 +1,14 @@
+﻿@page "/"
+
+<PageTitle>Index</PageTitle>
+
+<h1>Advanced Custom Data Filtering</h1>
+
+<p>This Small app was built to show case some advanced filering logic I created for large datasets. If you navigate to the data list page, you will see a mock dataset
+that uses this logic. The intention was to let the user create endless amounts of filtering by allowing them to insert as many where clauses as they want for each column.</p>
+
+<p>By clicking the filter button on each column, a menu will appear that will let you pick your operator, and/or clause, and values. You can add as many of these as you like.
+The page also features dynamic column show/hide. Clicking the columns menu will show the sliders for each column. The filtering logic for this page relies heavily on reflection
+and the dynamically builds an expression based on the data within the request from the page.</p>
+
+<SurveyPrompt Title="How is Blazor working for you?" />

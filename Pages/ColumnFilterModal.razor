@@ -1,0 +1,164 @@
+﻿@using AdvancedCustomDataFiltering.Models
+@using MudBlazor
+
+<style>
+    .mud-table-cell {
+        padding: 0.2rem !important;
+        font-size: 0.8rem !important;
+    }
+
+    .mud-text-field, .mud-button, .mud-time-picker {
+        font-size: 0.8rem !important;
+    }
+
+    .mud-input-control {
+        margin-top: 0px !important;
+    }
+
+    .mud-input {
+        margin-top: 0px !important;
+    }
+</style>
+
+<MudDialog DefaultFocus="DefaultFocus.LastChild" TitleClass="thead-color mb-3">
+    <TitleContent>
+        @column.Header Filter
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+            <MudTable Items="tempFilters" Hover="true" Dense="true" Breakpoint="Breakpoint.None" Class="mb-3" Bordered="true">
+                <RowTemplate>
+                    @{
+                        var index = tempFilters.IndexOf(context);
+                        bool isFirst = index > 0 ? false : true;
+                        bool twoSpan = false;
+                        if (isFirst && tempFilters.Count() > 1) { twoSpan = true; }
+                        if (index > 0)
+                        {
+                            <MudTd Style="width:20%;">
+                                <MudSelect @bind-Value="context.AndOr" Disabled="isFirst" Placeholder="And/Or" Required>
+                                    <MudSelectItem Value="@("and")">And</MudSelectItem>
+                                    <MudSelectItem Value="@("or")">Or</MudSelectItem>
+                                </MudSelect>
+                            </MudTd>
+                        }
+                    }
+                    <MudTd colspan="@(twoSpan ? 2 : 1)" Style="width:30%;">
+                        <OperatorDropdown @bind-Value="context.Operator" DataType="column.DataType" Required />
+                    </MudTd>
+                    @if (context.Operator != "is not empty" && context.Operator != "is empty")
+                    {
+                        @if (column.DataType == typeof(DateTime))
+                        {
+                            @*Figure out datetime conversion or add new field*@
+                            <MudDatePicker @bind-Date="context.DateTimeValue" style="padding-top:6px;" Margin="Margin.Dense" Required />
+                        }
+                        else
+                        {
+                            <MudTd Style="width:40%;">
+                                <MudTextField @bind-Value="context.Value" Placeholder="Value" Required />
+                            </MudTd>
+                        }
+                        
+                    }
+                    <MudTd Style="width:10%;">
+                        <MudButton Color="Color.Error" OnClick="@(() => RemoveRow(context))" Dense="true" Small="true" Class="float-end"><i class="fa-solid fa-trash"></i></MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudButton OnClick="AddRow" Variant="Variant.Filled" Color="Color.Secondary">Add Filter</MudButton>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Ok</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private MudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnSubmitSuccess { get; set; }
+
+    [Parameter]
+    public ColumnDefinition column { get; set; }
+
+    bool success;
+    string[] errors = { };
+    MudForm form;
+
+    private List<ColumnFilterDefinition> originalFilters = new List<ColumnFilterDefinition>();
+    private List<ColumnFilterDefinition> tempFilters = new List<ColumnFilterDefinition>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Create a deep copy of the original filters
+        originalFilters = column.Filters.Select(f => new ColumnFilterDefinition
+            {
+                AndOr = f.AndOr,
+                Operator = f.Operator,
+                Value = f.Value,
+                DateTimeValue = f.DateTimeValue
+            }).ToList();
+
+        // Initialize tempFilters with originalFilters
+        tempFilters = originalFilters.Select(f => new ColumnFilterDefinition
+            {
+                AndOr = f.AndOr,
+                Operator = f.Operator,
+                Value = f.Value,
+                DateTimeValue = f.DateTimeValue
+            }).ToList();
+
+        if (tempFilters.Count == 0)
+        {
+            AddRow();
+        }
+    }
+
+    private async void Cancel()
+    {
+        // Reset tempFilters to original
+        tempFilters = originalFilters.Select(f => new ColumnFilterDefinition
+            {
+                AndOr = f.AndOr,
+                Operator = f.Operator,
+                Value = f.Value,
+                DateTimeValue = f.DateTimeValue
+            }).ToList();
+        MudDialog.Cancel();
+    }
+
+    private async void Submit()
+    {
+        await form.Validate();
+        if (form.IsValid)
+        {
+            // Only bind tempFilters to column.Filters on submit
+            column.Filters = tempFilters.Select(f => new ColumnFilterDefinition
+                {
+                    AndOr = f.AndOr,
+                    Operator = f.Operator,
+                    Value = f.Value,
+                    DateTimeValue = f.DateTimeValue
+                }).ToList();
+
+            await OnSubmitSuccess.InvokeAsync(true);  // Notify the parent component
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+    }
+
+    private void AddRow()
+    {
+        tempFilters.Add(new ColumnFilterDefinition());
+        StateHasChanged();
+    }
+
+    private void RemoveRow(ColumnFilterDefinition filter)
+    {
+        tempFilters.Remove(filter);
+    }
+}

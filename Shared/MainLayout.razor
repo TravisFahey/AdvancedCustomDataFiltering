@@ -1,0 +1,42 @@
+﻿@inherits LayoutComponentBase
+@using MudBlazor
+@inject IHttpContextAccessor httpContextAccessor
+@inject NavigationManager navigationManager
+
+<MudThemeProvider Theme="@MyCustomTheme" />
+<MudSnackbarProvider />
+<MudDialogProvider Position="DialogPosition.Center"
+                   CloseOnEscapeKey="true"
+                   MaxWidth="MaxWidth.ExtraSmall"
+                   FullWidth="true" />
+
+<PageTitle>AdvancedCustomDataFiltering</PageTitle>
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    MudTheme MyCustomTheme = new MudTheme()
+        {
+            Palette = new Palette()
+            {
+                Primary = Colors.Teal.Darken2,
+                Secondary = Colors.Orange.Darken1,
+            //Define other properties here.
+            },
+
+        };
+}
