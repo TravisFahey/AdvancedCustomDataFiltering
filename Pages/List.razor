@@ -228,6 +228,7 @@
 		new BreadcrumbItem("Home", href: "#"),
 		new BreadcrumbItem("List", href: null, disabled: true)
 	};
+
     private List<ColumnDefinition> columns = new List<ColumnDefinition>
     {
         new ColumnDefinition { Header = "Id", DataBinding = o => o.Id, IsVisible = true, SortDirection = "asc", DataType = typeof(int), PropertyName = "Id" },
@@ -239,8 +240,8 @@
         new ColumnDefinition { Header = "State", DataBinding = o => o.State, IsVisible = true, DataType = typeof(string), PropertyName = "State" },
         new ColumnDefinition { Header = "Zip", DataBinding = o => o.Zip, IsVisible = true, DataType = typeof(string), PropertyName = "Zip" }
     };
+    
     private List<int> selectedRecords = new List<int>();
-
 
     //Page Initialization Logic
     protected override void OnInitialized()
@@ -388,7 +389,7 @@
         requestModel.Page = 1;
     }
 
-    private async Task HandleSortClick(ColumnDefinition column)
+    private void HandleSortClick(ColumnDefinition column)
     {
         switch (column.SortDirection)
         {
@@ -444,19 +445,6 @@
         selectedRecords.Clear();
         LoadData();
     }
-
-    // private async Task OpenUpdateDialogAsync()
-    // {
-    //     var parameters = new DialogParameters
-    //     {
-    //         { "selectedObservations", selectedRecords },
-    //         { "OnSubmitSuccess", EventCallback.Factory.Create<bool>(this, OnSubmitSuccess) }
-    //     };
-
-    //     var options = new DialogOptions { CloseOnEscapeKey = true };
-
-    //     await DialogService.ShowAsync<UpdateObsModal>("Update Observation Status", parameters, options);
-    // }
 
     //Export Logic
     private void ExportToCsv()
