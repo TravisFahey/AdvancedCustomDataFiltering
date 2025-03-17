@@ -6,3 +6,5 @@
  The filtering logic for this page relies heavily on reflection to dynamically create an expression that can be used to filter a queryable object. The main service method simply takes a request model and iterates through the filters the user has selected for each attribute of the entity dataset they are querying.
 
  The code is not perfect and this project was very experimental, but I hope you find it interesting!
+
+ url: https://travisfahey.dev/ACDF
